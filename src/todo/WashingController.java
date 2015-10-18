@@ -8,6 +8,8 @@ public class WashingController implements ButtonListener {
 	private TemperatureController tempControl;
 	private SpinController spinControl;
 	private WaterController waterControl;
+	
+	private WashingProgram currentProgram;
 
 	// TODO: add suitable attributes
 
@@ -21,20 +23,37 @@ public class WashingController implements ButtonListener {
 		tempControl.start();
 		spinControl.start();
 		waterControl.start();
+		System.out.println("Temp: " +tempControl.getPriority());
+		System.out.println("Spin: " +spinControl.getPriority());
+		System.out.println("Water: " +waterControl.getPriority());
 
 	}
 
 	public void processButton(int theButton) {
 		// TODO: implement this method
-		WashingProgram wp = null;
 		switch (theButton) {
 		case 1:
-			wp = new WashingProgram1(theMachine, theSpeed, tempControl, waterControl, spinControl);
+			currentProgram = new WashingProgram1(theMachine, theSpeed, tempControl, waterControl, spinControl);
+			currentProgram.start();
+			break;
+		case 2:
+			currentProgram = new WashingProgram2(theMachine, theSpeed, tempControl, waterControl, spinControl);
+			currentProgram.start();
 			break;
 		case 3:
-			wp = new WashingProgram3(theMachine, theSpeed, tempControl, waterControl, spinControl);
+			currentProgram = new WashingProgram3(theMachine, theSpeed, tempControl, waterControl, spinControl);
+			currentProgram.start();
+			break;
+		case 0:
+//			tempControl.terminate();
+//			spinControl.interrupt();
+//			waterControl.interrupt();
+//			currentProgram.interrupt();
+			
+			WashingProgram wp = new WashingProgram0(theMachine, theSpeed, tempControl, waterControl, spinControl);
+			currentProgram.terminate();
+//			wp.start();
 			break;
 		}
-		wp.start();
 	}
 }

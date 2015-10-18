@@ -1,47 +1,63 @@
 package todo;
 
-
 import se.lth.cs.realtime.*;
 import se.lth.cs.realtime.event.RTEventBuffer;
 import done.AbstractWashingMachine;
-
 
 public class WaterController extends PeriodicThread {
 	private double speed;
 	private AbstractWashingMachine mach;
 	private WaterEvent currentEvent;
-	private RTEventBuffer programMailbox;
+	
+	private boolean filling;
+	private double targetWaterLevel;
+	private RTThread sourceThread;
+	
+	private boolean draining;
 
 	// TODO: add suitable attributes
 
 	public WaterController(AbstractWashingMachine mach, double speed) {
-		super((long) (10000/speed)); // TODO: replace with suitable period
+		super((long) (10000 / speed)); // TODO: replace with suitable period
 		this.mach = mach;
 		this.speed = speed;
 	}
 
 	public void perform() {
-		if (!mailbox.isEmpty() || currentEvent == null) {
-			currentEvent = (WaterEvent) mailbox.fetch();
-		}
-		if (currentEvent.getMode() == WaterEvent.WATER_FILL) {
-			if (mach.getWaterLevel() < currentEvent.getLevel()) {
-				mach.setFill(true);
-				
-			} else {
-				mach.setFill(false);
-				currentEvent = null;
-				programMailbox.doPost(new AckEvent(this));
-			}
-		} else if (currentEvent.getMode() == WaterEvent.WATER_DRAIN) {
-			mach.setDrain(true);
-			while(mach.getWaterLevel() > 0) {}
-			mach.setDrain(false);
-			programMailbox.doPost(new AckEvent(this));
-		}
-	}
+		currentEvent = (WaterEvent) mailbox.tryFetch();
 
-	public void addMailbox(RTEventBuffer mailbox) {
-		programMailbox = mailbox;
+		if (currentEvent != null ) {
+			if (currentEvent.getMode() == WaterEvent.WATER_FILL) {
+				filling = true;
+				mach.setFill(true);
+				targetWaterLevel = currentEvent.getLevel();
+				sourceThread = ((RTThread) currentEvent.getSource());
+			} else if (currentEvent.getMode() == WaterEvent.WATER_DRAIN) {
+				draining = true;
+				mach.setDrain(true);
+			} else if (currentEvent.getMode() == WaterEvent.WATER_IDLE) {
+				mach.setFill(false);
+				mach.setDrain(false);
+				filling = false;
+				draining = false;
+				((RTThread) currentEvent.getSource()).putEvent(new AckEvent(this));
+			}
+		}
+
+		if (filling) {
+			if (mach.getWaterLevel() > targetWaterLevel) {
+				filling = false;
+				mach.setFill(false);
+				sourceThread.putEvent(new AckEvent(this));
+			}
+		}
+		
+		if (draining) {
+			if (mach.getWaterLevel() == 0) {
+				draining = false;
+				mach.setDrain(false);
+				sourceThread.putEvent(new AckEvent(this));
+			}
+		}
 	}
 }

@@ -2,13 +2,20 @@ package todo;
 
 import done.AbstractWashingMachine;
 import se.lth.cs.realtime.PeriodicThread;
+import se.lth.cs.realtime.RTThread;
+import se.lth.cs.realtime.event.RTEvent;
 import se.lth.cs.realtime.event.RTEventBuffer;
 
 public class TemperatureController extends PeriodicThread {
+
 	private AbstractWashingMachine mach;
 	private double speed;
 	private TemperatureEvent currentEvent;
-	private RTEventBuffer programMailbox;
+
+	private boolean stabilizing;
+	private double targetTemp;
+	private boolean ackSent;
+	private RTThread sourceThread;
 
 	// TODO: add suitable attributes
 
@@ -19,31 +26,32 @@ public class TemperatureController extends PeriodicThread {
 	}
 
 	public void perform() {
-		boolean tempReached = false;
-		
-		if (!mailbox.isEmpty() || currentEvent == null) {
-			currentEvent = (TemperatureEvent) mailbox.fetch();
+		System.out.println("Tempcontrol perform()");
+		currentEvent = (TemperatureEvent) mailbox.tryFetch();
+
+		if (currentEvent != null) {
 			if (currentEvent.getMode() == TemperatureEvent.TEMP_SET) {
-				tempReached = false;
+				stabilizing = true;
+				ackSent = false;
+				targetTemp = currentEvent.getTemperature();
+				sourceThread = (RTThread) currentEvent.getSource();
+			} else if (currentEvent.getMode() == TemperatureEvent.TEMP_IDLE) {
+				mach.setHeating(false);
+				stabilizing = false;
+				((RTThread) currentEvent.getSource()).putEvent(new AckEvent(this));
 			}
 		}
 
-		if (currentEvent.getMode() == TemperatureEvent.TEMP_SET) {
-			if (currentEvent.getTemperature() - 1.5 > mach.getTemperature()) {
+		if (stabilizing) {
+			if (targetTemp - 1.5 > mach.getTemperature()) {
 				mach.setHeating(true);
 			} else {
-				if (!tempReached) {
-					tempReached = true;
-					programMailbox.doPost(new AckEvent(this));
-				}
 				mach.setHeating(false);
+				if (!ackSent) {
+					sourceThread.putEvent(new AckEvent(this));
+					ackSent = true;
+				}
 			}
-		} else if (currentEvent.getMode() == TemperatureEvent.TEMP_IDLE) {
-			mach.setHeating(false);
 		}
-	}
-
-	public void addMailbox(RTEventBuffer mailbox) {
-		programMailbox = mailbox;
 	}
 }

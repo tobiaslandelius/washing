@@ -8,15 +8,10 @@ public class WashingProgram1 extends WashingProgram {
 	protected WashingProgram1(AbstractWashingMachine mach, double speed, TemperatureController tempController,
 			WaterController waterController, SpinController spinController) {
 		super(mach, speed, tempController, waterController, spinController);
-		waterController.addMailbox(mailbox);
-		tempController.addMailbox(mailbox);
-		spinController.addMailbox(mailbox);
 	}
 
 	@Override
 	protected void wash() throws InterruptedException {
-		// TODO Auto-generated method stub
-
 		// Close Hatch
 		myMachine.setLock(true);
 
@@ -25,17 +20,17 @@ public class WashingProgram1 extends WashingProgram {
 		AckEvent ev = (AckEvent) mailbox.doFetch();
 
 		// Switch on temp regulation
-		myTempController.putEvent(new TemperatureEvent(this, TemperatureEvent.TEMP_SET, 25));
+		myTempController.putEvent(new TemperatureEvent(this, TemperatureEvent.TEMP_SET, 30));
 		ev = (AckEvent) mailbox.doFetch();
 
 		// Wait 30 min
-		System.out.println("innan");
 		Thread.sleep((long) (5 * 60 * 1000 / mySpeed));
-		System.out.println("efter");
+		System.out.println("Sleep done...");
 
 		// Switch off temp regulation
 		myTempController.putEvent(new TemperatureEvent(this, TemperatureEvent.TEMP_IDLE, 0.0));
-
+		ev = (AckEvent) mailbox.doFetch();
+		
 		// Drain water
 		myWaterController.putEvent(new WaterEvent(this, WaterEvent.WATER_DRAIN, 0.0));
 		ev = (AckEvent) mailbox.doFetch();
@@ -50,8 +45,9 @@ public class WashingProgram1 extends WashingProgram {
 		}
 		
 		mySpinController.putEvent(new SpinEvent(this, SpinEvent.SPIN_SLOW));
-		
-
+		ev = (AckEvent) mailbox.doFetch();
+	
+		myMachine.setLock(false);
 		System.out.println("Done!");
 	}
 
